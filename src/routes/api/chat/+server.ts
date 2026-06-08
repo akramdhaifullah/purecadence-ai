@@ -15,6 +15,10 @@ type ToolChoice = {
 	response?: string;
 };
 
+type ToolResponse = {
+	content?: Array<{ type?: string; text?: string }>;
+};
+
 const SYSTEM_PROMPT = `You are a concise assistant.
 You can call MCP tools to answer user questions.
 Return JSON only, with either:
@@ -40,6 +44,29 @@ function safeParse(text: string): ToolChoice | null {
 
 function formatConversation(messages: ChatMessage[]): string {
 	return messages.map((message) => `${message.role}: ${message.content}`).join('\n');
+}
+
+function extractToolData(result: unknown): unknown | null {
+	if (!result || typeof result !== 'object') return null;
+	const response = result as ToolResponse;
+	const textContent = response.content?.find((item) => item.type === 'text')?.text;
+	if (!textContent) return null;
+
+	try {
+		const parsed = JSON.parse(textContent);
+		if (Array.isArray(parsed)) return parsed;
+		if (parsed && typeof parsed === 'object') {
+			if (Array.isArray((parsed as { activities?: unknown }).activities)) {
+				return (parsed as { activities: unknown[] }).activities;
+			}
+			if (Array.isArray((parsed as { activityList?: unknown }).activityList)) {
+				return (parsed as { activityList: unknown[] }).activityList;
+			}
+		}
+		return parsed;
+	} catch {
+		return null;
+	}
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -82,6 +109,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			arguments: firstParsed.args ?? {}
 		});
 
+		const toolData = extractToolData(toolResult);
+
 		const secondPrompt = [
 			SYSTEM_PROMPT,
 			`Tool call: ${firstParsed.tool}`,
@@ -93,7 +122,11 @@ export const POST: RequestHandler = async ({ request }) => {
 		const secondResult = await model.generateContent(secondPrompt);
 		const secondText = secondResult.response.text();
 		const secondParsed = safeParse(extractJson(secondText));
-		return json({ reply: secondParsed?.response ?? secondText.trim() });
+		return json({
+			reply: secondParsed?.response ?? secondText.trim(),
+			data: toolData ?? toolResult,
+			tool: firstParsed.tool
+		});
 	}
 
 	return json({ reply: firstParsed?.response ?? firstText.trim() });
