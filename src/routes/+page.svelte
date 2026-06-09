@@ -6,6 +6,8 @@
 		tool?: string;
 	};
 
+	let { data }: { data: { email?: string } } = $props();
+
 	let input = $state('');
 	let messages = $state<ChatMessage[]>([]);
 	let loading = $state(false);
@@ -32,7 +34,9 @@
 		const name =
 			(value.activityName as string | undefined) ??
 			(value.name as string | undefined) ??
-			(value.activityType?.typeKey as string | undefined) ??
+			((value.activityType as Record<string, unknown> | undefined)?.typeKey as
+				| string
+				| undefined) ??
 			(value.type as string | undefined) ??
 			'Activity';
 		const start =
@@ -135,20 +139,30 @@
 </script>
 
 <main>
-	<h1>Garmin MCP Chat</h1>
+	<header class="header-container">
+		<div class="header-title">
+			<h1>Garmin MCP Chat</h1>
+			{#if data?.email}
+				<p>Syncing data for <strong>{data.email}</strong></p>
+			{/if}
+		</div>
+		<form action="/logout" method="POST">
+			<button type="submit" class="logout-btn">Logout</button>
+		</form>
+	</header>
 
 	<section class="chat-window">
 		{#if messages.length === 0}
 			<p class="muted">Ask about your Garmin data or request a tool call.</p>
 		{/if}
 
-		{#each messages as message}
+		{#each messages as message, index (index)}
 			<div class={`message ${message.role}`}>
 				<strong>{message.role === 'user' ? 'You' : 'Assistant'}</strong>
 				<p>{message.content}</p>
 				{#if Array.isArray(message.data)}
 					<ul class="activity-list">
-						{#each message.data as item}
+						{#each message.data as item, itemIndex (itemIndex)}
 							<li>{formatActivity(item)}</li>
 						{/each}
 					</ul>
@@ -181,3 +195,42 @@
 		</button>
 	</form>
 </main>
+
+<style>
+	.header-container {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 1.5rem;
+		border-bottom: 1px solid #e5e7eb;
+		padding-bottom: 1rem;
+	}
+
+	.header-title h1 {
+		margin: 0;
+		font-size: 1.5rem;
+	}
+
+	.header-title p {
+		margin: 0.25rem 0 0;
+		font-size: 0.85rem;
+		color: #6b7280;
+	}
+
+	.logout-btn {
+		font-size: 0.85rem;
+		color: #4b5563;
+		background: none;
+		border: 1px solid #d1d5db;
+		padding: 0.4rem 0.85rem;
+		border-radius: 999px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.logout-btn:hover {
+		color: #dc2626;
+		border-color: #fca5a5;
+		background: #fef2f2;
+	}
+</style>

@@ -1,6 +1,9 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { env } from '$env/dynamic/private';
+import { createHash } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 type ServerParams = {
 	command: string;
@@ -24,12 +27,10 @@ const GARMIN_ENV_KEYS = [
 	'GARMIN_PASSWORD_FILE',
 	'GARMIN_IS_CN',
 	'GARMIN_ENABLED_TOOLS',
-	'GARMIN_DISABLED_TOOLS'
+	'GARMIN_DISABLED_TOOLS',
+	'GARMINTOKENS',
+	'GARMINTOKENS_BASE64'
 ] as const;
-
-let client: Client | null = null;
-let transport: StdioClientTransport | null = null;
-let connectPromise: Promise<Client> | null = null;
 
 function parseArgs(raw: string | undefined): string[] | null {
 	if (!raw) return null;
@@ -45,7 +46,21 @@ function parseArgs(raw: string | undefined): string[] | null {
 	throw new Error('MCP_SERVER_ARGS must be a JSON array of strings');
 }
 
-function buildServerEnv(): Record<string, string> | undefined {
+function getUserTokenPaths(email: string): { tokenStore: string; base64TokenStore: string } {
+	const normalizedEmail = email.trim().toLowerCase();
+	const emailHash = createHash('sha256').update(normalizedEmail).digest('hex');
+	const root = env.GARMIN_TOKEN_ROOT ?? join(process.cwd(), '.garminconnect-tokens');
+	const tokenRoot = join(root, emailHash);
+
+	mkdirSync(tokenRoot, { recursive: true });
+
+	return {
+		tokenStore: join(tokenRoot, 'tokens'),
+		base64TokenStore: join(tokenRoot, 'tokens_base64')
+	};
+}
+
+function buildServerEnv(email?: string, password?: string): Record<string, string> | undefined {
 	const serverEnv: Record<string, string> = {};
 
 	for (const key of GARMIN_ENV_KEYS) {
@@ -68,46 +83,74 @@ function buildServerEnv(): Record<string, string> | undefined {
 		}
 	}
 
+	if (email) {
+		const tokenPaths = getUserTokenPaths(email);
+		serverEnv['GARMIN_EMAIL'] = email;
+		serverEnv['GARMINTOKENS'] = tokenPaths.tokenStore;
+		serverEnv['GARMINTOKENS_BASE64'] = tokenPaths.base64TokenStore;
+	}
+	if (password) {
+		serverEnv['GARMIN_PASSWORD'] = password;
+	}
+
 	return Object.keys(serverEnv).length > 0 ? serverEnv : undefined;
 }
 
-function getServerParams(): ServerParams {
+function getServerParams(email?: string, password?: string): ServerParams {
 	const command = env.MCP_SERVER_COMMAND ?? DEFAULT_COMMAND;
 	const args = parseArgs(env.MCP_SERVER_ARGS) ?? DEFAULT_ARGS;
 
 	return {
 		command,
 		args,
-		env: buildServerEnv()
+		env: buildServerEnv(email, password)
 	};
 }
+type ClientInstance = {
+	client: Client;
+	transport: StdioClientTransport;
+};
 
-async function connectMcp(): Promise<Client> {
-	const server = getServerParams();
-	transport = new StdioClientTransport(server);
-	client = new Client({ name: 'garmin-trainer', version: '0.0.1' });
-	await client.connect(transport);
-	return client;
+const clients = new Map<string, ClientInstance | Promise<ClientInstance>>();
+
+export async function getMcpClient(email?: string, password?: string): Promise<Client> {
+	const key = email || 'default';
+	let instanceOrPromise = clients.get(key);
+
+	if (!instanceOrPromise) {
+		const connectPromise = (async () => {
+			const server = getServerParams(email, password);
+			const transport = new StdioClientTransport(server);
+			const client = new Client({ name: 'garmin-trainer', version: '0.0.1' });
+			await client.connect(transport);
+			const instance = { client, transport };
+			clients.set(key, instance);
+			return instance;
+		})();
+
+		clients.set(key, connectPromise);
+		instanceOrPromise = connectPromise;
+	}
+
+	try {
+		const resolved = await instanceOrPromise;
+		return resolved.client;
+	} catch (error) {
+		clients.delete(key);
+		throw error;
+	}
 }
 
-export async function getMcpClient(): Promise<Client> {
-	if (client) {
-		return client;
+export async function closeMcpClient(email?: string): Promise<void> {
+	const key = email || 'default';
+	const instanceOrPromise = clients.get(key);
+	if (instanceOrPromise) {
+		clients.delete(key);
+		try {
+			const resolved = await instanceOrPromise;
+			await resolved.transport.close();
+		} catch {
+			// ignore close errors
+		}
 	}
-
-	if (!connectPromise) {
-		connectPromise = connectMcp();
-	}
-
-	return connectPromise;
-}
-
-export async function closeMcpClient(): Promise<void> {
-	if (transport) {
-		await transport.close();
-	}
-
-	client = null;
-	transport = null;
-	connectPromise = null;
 }

@@ -69,7 +69,13 @@ function extractToolData(result: unknown): unknown | null {
 	}
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, cookies }) => {
+	const email = cookies.get('garmin_email');
+	const password = cookies.get('garmin_password');
+	if (!email || !password) {
+		return json({ error: 'Unauthorized: Garmin credentials not found' }, { status: 401 });
+	}
+
 	const apiKey = env.GEMINI_API_KEY;
 	if (!apiKey) {
 		return json({ error: 'GEMINI_API_KEY is not set' }, { status: 500 });
@@ -82,7 +88,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		return json({ error: 'No messages provided' }, { status: 400 });
 	}
 
-	const client = await getMcpClient();
+	const client = await getMcpClient(email, password);
 	const { tools } = await client.listTools();
 	const toolIndex = tools.map((tool) => ({
 		name: tool.name,
