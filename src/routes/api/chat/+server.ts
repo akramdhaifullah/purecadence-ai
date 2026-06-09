@@ -21,6 +21,7 @@ type ToolResponse = {
 
 const SYSTEM_PROMPT = `You are a concise assistant.
 You can call MCP tools to answer user questions.
+If a user asks about events in relative time (e.g., "today", "last week", "this month"), you MUST call the 'get_current_datetime' tool first to establish the current date before making any other tool calls that require dates.
 Return JSON only, with either:
 {"tool":"tool_name","args":{...}} or {"response":"text"}.
 Do not include extra keys.`;
@@ -96,44 +97,76 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		inputSchema: tool.inputSchema ?? {}
 	}));
 
+	toolIndex.push({
+		name: 'get_current_datetime',
+		description:
+			'Get the current date and time in ISO 8601 format. Useful for filtering activities by date, scheduling workouts, or any task requiring the current time.',
+		inputSchema: {
+			type: 'object',
+			properties: {}
+		}
+	});
+
 	const genAI = new GoogleGenerativeAI(apiKey);
 	const model = genAI.getGenerativeModel({ model: requestedModel });
 
-	const firstPrompt = [
+	let currentPrompt = [
 		SYSTEM_PROMPT,
 		`Tools: ${JSON.stringify(toolIndex)}`,
 		`Conversation:\n${formatConversation(messages)}`
 	].join('\n\n');
 
-	const firstResult = await model.generateContent(firstPrompt);
-	const firstText = firstResult.response.text();
-	const firstParsed = safeParse(extractJson(firstText));
+	let finalToolName: string | undefined;
+	let finalToolData: unknown = null;
+	const MAX_ITERATIONS = 5;
 
-	if (firstParsed?.tool) {
-		const toolResult = await client.callTool({
-			name: firstParsed.tool,
-			arguments: firstParsed.args ?? {}
-		});
+	for (let i = 0; i < MAX_ITERATIONS; i++) {
+		const result = await model.generateContent(currentPrompt);
+		const text = result.response.text();
+		const parsed = safeParse(extractJson(text));
 
-		const toolData = extractToolData(toolResult);
+		if (parsed?.response) {
+			return json({
+				reply: parsed.response,
+				data: finalToolData,
+				tool: finalToolName
+			});
+		} else if (parsed?.tool) {
+			finalToolName = parsed.tool;
+			let toolResult: unknown;
 
-		const secondPrompt = [
-			SYSTEM_PROMPT,
-			`Tool call: ${firstParsed.tool}`,
-			`Tool args: ${JSON.stringify(firstParsed.args ?? {})}`,
-			`Tool result: ${JSON.stringify(toolResult)}`,
-			`Conversation:\n${formatConversation(messages)}`
-		].join('\n\n');
+			if (parsed.tool === 'get_current_datetime') {
+				const now = new Date();
+				toolResult = {
+					content: [{ type: 'text', text: JSON.stringify({ current_datetime: now.toISOString() }) }]
+				};
+				finalToolData = { current_datetime: now.toISOString() };
+			} else {
+				try {
+					toolResult = await client.callTool({
+						name: parsed.tool,
+						arguments: parsed.args ?? {}
+					});
+					finalToolData = extractToolData(toolResult) ?? toolResult;
+				} catch (err) {
+					const errorMsg = err instanceof Error ? err.message : String(err);
+					toolResult = { error: `Failed to execute tool ${parsed.tool}: ${errorMsg}` };
+				}
+			}
 
-		const secondResult = await model.generateContent(secondPrompt);
-		const secondText = secondResult.response.text();
-		const secondParsed = safeParse(extractJson(secondText));
-		return json({
-			reply: secondParsed?.response ?? secondText.trim(),
-			data: toolData ?? toolResult,
-			tool: firstParsed.tool
-		});
+			currentPrompt += `\n\nTool call: ${parsed.tool}\nTool args: ${JSON.stringify(parsed.args ?? {})}\nTool result: ${JSON.stringify(toolResult)}`;
+		} else {
+			return json({
+				reply: text.trim(),
+				data: finalToolData,
+				tool: finalToolName
+			});
+		}
 	}
 
-	return json({ reply: firstParsed?.response ?? firstText.trim() });
+	return json({
+		reply: 'I reached the maximum number of steps trying to answer your question.',
+		data: finalToolData,
+		tool: finalToolName
+	});
 };

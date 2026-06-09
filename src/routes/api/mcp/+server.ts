@@ -12,5 +12,18 @@ export const GET: RequestHandler = async ({ cookies }) => {
 	const client = await getMcpClient(email, password);
 	const { tools } = await client.listTools();
 
-	return json({ tools });
+	const allTools = [
+		...tools,
+		{
+			name: 'get_current_datetime',
+			description:
+				'Get the current date and time in ISO 8601 format. Useful for filtering activities by date, scheduling workouts, or any task requiring the current time.',
+			inputSchema: {
+				type: 'object',
+				properties: {}
+			}
+		}
+	];
+
+	return json({ tools: allTools });
 };
