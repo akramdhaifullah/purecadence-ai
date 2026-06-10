@@ -49,7 +49,16 @@ function parseArgs(raw: string | undefined): string[] | null {
 function getUserTokenPaths(email: string): { tokenStore: string; base64TokenStore: string } {
 	const normalizedEmail = email.trim().toLowerCase();
 	const emailHash = createHash('sha256').update(normalizedEmail).digest('hex');
-	const root = env.GARMIN_TOKEN_ROOT ?? join(process.cwd(), '.garminconnect-tokens');
+
+	let root = env.GARMIN_TOKEN_ROOT;
+	if (!root) {
+		// Vercel and AWS Lambda environments have a read-only filesystem except for the /tmp folder
+		if (process.env.VERCEL || process.env.LAMBDA_TASK_ROOT || process.env.NOW_BUILDER) {
+			root = '/tmp/.garminconnect-tokens';
+		} else {
+			root = join(process.cwd(), '.garminconnect-tokens');
+		}
+	}
 	const tokenRoot = join(root, emailHash);
 
 	mkdirSync(tokenRoot, { recursive: true });
