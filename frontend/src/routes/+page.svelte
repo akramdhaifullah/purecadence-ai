@@ -26,19 +26,9 @@
 			</nav>
 
 			<div class="flex items-center gap-4">
-				{#if data?.isLoggedIn}
-					<span class="hidden lg:inline text-xs text-slate-500">Connected as {data.email}</span>
-					<a href="/chat" class="rounded-full bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition shadow-sm">
-						Go to Chat
-					</a>
-				{:else}
-					<a href="/login" class="text-sm font-medium text-slate-600 hover:text-indigo-600 transition">
-						Sign In
-					</a>
-					<a href="/login" class="rounded-full bg-slate-950 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800 transition">
-						Get Started
-					</a>
-				{/if}
+				<a href="#features" class="rounded-full bg-slate-950 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800 transition">
+					Get Started
+				</a>
 			</div>
 		</div>
 	</header>
@@ -47,7 +37,7 @@
 	<section class="relative px-6 py-20 lg:py-32">
 		<div class="mx-auto max-w-5xl text-center">
 			<span class="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10 mb-6">
-				Powered by Gemini 3.5 & Garmin MCP
+				Powered by Gemini 3.5
 			</span>
 			<h1 class="text-4xl font-extrabold tracking-tight text-slate-950 sm:text-6xl">
 				Your Garmin training data, <br/>
@@ -57,18 +47,9 @@
 				purecadence.ai connects to your Garmin account using state-of-the-art AI. Ask questions, analyze performance trends, build workouts, and schedule them directly to your wrist.
 			</p>
 			<div class="mt-10 flex items-center justify-center gap-x-6">
-				{#if data?.isLoggedIn}
-					<a href="/chat" class="rounded-full bg-indigo-600 px-8 py-3.5 text-base font-semibold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 transition">
-						Go to Coach Chat
-					</a>
-				{:else}
-					<a href="/login" class="rounded-full bg-slate-950 px-8 py-3.5 text-base font-semibold text-white hover:bg-slate-800 shadow-md transition">
-						Connect Your Garmin
-					</a>
-					<a href="#features" class="text-sm font-semibold leading-6 text-slate-900 hover:text-indigo-600 transition">
-						Learn more <span aria-hidden="true">→</span>
-					</a>
-				{/if}
+				<a href="#features" class="text-sm font-semibold leading-6 text-slate-900 hover:text-indigo-600 transition">
+					Learn more <span aria-hidden="true">→</span>
+				</a>
 			</div>
 		</div>
 
@@ -252,7 +233,7 @@
 					<ul class="mt-6 space-y-2 text-xs text-slate-600">
 						<li class="flex items-center gap-2">
 							<svg class="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-							Full Garmin Connect MCP tool coverage
+							Full Garmin Connect coverage
 						</li>
 						<li class="flex items-center gap-2">
 							<svg class="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
@@ -268,15 +249,9 @@
 					<span class="text-sm font-semibold text-slate-500">Flat Rate</span>
 					<p class="mt-2 text-4xl font-extrabold text-slate-950">$9<span class="text-base font-normal text-slate-500">/mo</span></p>
 					<p class="text-xs text-slate-400 mt-1">Cancel anytime</p>
-					{#if data?.isLoggedIn}
-						<a href="/chat" class="mt-6 block w-full rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition">
-							Start Chatting
-						</a>
-					{:else}
-						<a href="/login" class="mt-6 block w-full rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition">
-							Get Access Now
-						</a>
-					{/if}
+					<a href="#features" class="mt-6 block w-full rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition text-center">
+						Get Access Now
+					</a>
 				</div>
 			</div>
 		</div>
