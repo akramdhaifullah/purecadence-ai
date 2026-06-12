@@ -2,8 +2,12 @@
 purecadence.ai — FastAPI Backend
 """
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+load_dotenv(".env.local")
+load_dotenv()
 
 from backend.api import router as api_router
 

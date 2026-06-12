@@ -11,6 +11,8 @@ from garminconnect import (
 )
 from pydantic import BaseModel, EmailStr
 
+from backend.supabase_client import supabase
+
 router = APIRouter()
 
 
@@ -28,8 +30,6 @@ class LoginResponse(BaseModel):
 async def login(body: LoginRequest):
     """
     Authenticate with Garmin Connect credentials.
-
-    TODO: Replace this stub with real Garmin session auth.
     """
     if not body.email or not body.password:
         raise HTTPException(status_code=400, detail="Email and password are required.")
@@ -47,6 +47,39 @@ async def login(body: LoginRequest):
                     garmin_tokens = json.load(f)
             else:
                 raise RuntimeError("login did not produce token file")
+            
+        # Sync user to Supabase auth.users
+        user_id = None
+        try:
+            # Attempt login first
+            auth_res = supabase.auth.sign_in_with_password({
+                "email": body.email,
+                "password": body.password
+            })
+            if auth_res.user:
+                user_id = auth_res.user.id
+        except Exception:
+            # If login fails, try to sign up
+            try:
+                auth_res = supabase.auth.sign_up({
+                    "email": body.email,
+                    "password": body.password
+                })
+                if auth_res.user:
+                    user_id = auth_res.user.id
+            except Exception as e:
+                print(f"Supabase user creation failed: {e}")
+
+        # Save tokens to user_tokens table
+        if user_id and garmin_tokens:
+            token_data = {
+                "user_id": user_id,
+                **garmin_tokens
+            }
+            try:
+                supabase.table("user_tokens").upsert(token_data).execute()
+            except Exception as e:
+                print(f"Failed to save tokens to user_tokens: {e}")
 
     except GarminConnectAuthenticationError:
         raise HTTPException(status_code=401, detail="Invalid credentials.")
