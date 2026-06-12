@@ -79,7 +79,7 @@ export default function Home() {
 
                     <div className="flex items-center gap-4">
                         <a
-                            href="#features"
+                            href="/login"
                             className="rounded-full bg-slate-950 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800 transition"
                         >
                             Get Started
@@ -474,7 +474,7 @@ export default function Home() {
                                 Cancel anytime
                             </p>
                             <a
-                                href="#features"
+                                href="/login"
                                 className="mt-6 block w-full rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition text-center"
                             >
                                 Get Access Now
